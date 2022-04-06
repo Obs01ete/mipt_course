@@ -25,11 +25,11 @@
 
 #pragma once
 
-#include <pcl/surface/convex_hull.h>
 #include <pcl/surface/concave_hull.h>
 
 #include "interface_types.h"
 
+#include "graham_scan.hpp"
 
 namespace {
     // A special label that is assigned
@@ -47,20 +47,27 @@ namespace lidar_course {
 // Choice between convex and concave hull
 enum HullType
 {
-    HullTypeConvex,
-    HullTypeConcave
+    Convex,
+    Concave
+};
+
+enum class ConvexType
+{
+    Std,
+    Graham
 };
 
 
 // A function that multiplexes convex and concave 2D hulls
 template<typename T>
 auto GenericHull2D(const typename pcl::PointCloud<T>::Ptr& flat_cloud_ptr,
-    HullType hull_type, float alpha = 0.9f)
+    HullType hull_type, ConvexType conv_type = ConvexType::Std, float alpha = 0.9f)
 {
     auto flat_hull_cloud_ptr = std::make_shared<pcl::PointCloud<pcl::PointXYZ> >();
     auto flat_polygons_ptr = std::make_shared<std::vector<pcl::Vertices> >();
 
-    if (hull_type == HullTypeConcave)
+
+    if (hull_type == HullType::Concave)
     {
         pcl::ConcaveHull<pcl::PointXYZ> concave_hull;
         concave_hull.setInputCloud(flat_cloud_ptr);
@@ -70,10 +77,19 @@ auto GenericHull2D(const typename pcl::PointCloud<T>::Ptr& flat_cloud_ptr,
     }
     else
     {
-        pcl::ConvexHull<pcl::PointXYZ> convex_hull;
-        convex_hull.setInputCloud(flat_cloud_ptr);
-        convex_hull.setDimension(2);
-        convex_hull.reconstruct(*flat_hull_cloud_ptr, *flat_polygons_ptr);
+        if (conv_type == ConvexType::Std)
+        {
+            pcl::ConvexHull<pcl::PointXYZ> convex_hull;
+            convex_hull.setInputCloud(flat_cloud_ptr);
+            convex_hull.setDimension(2);
+            convex_hull.reconstruct(*flat_hull_cloud_ptr, *flat_polygons_ptr);
+        }
+        else
+        {
+            graham::GrahamHull<pcl::PointXYZ> graham_hull;
+            graham_hull.setInputCloud(flat_cloud_ptr);
+            graham_hull.reconstruct(*flat_hull_cloud_ptr, *flat_polygons_ptr);
+        }
     }
 
     return std::make_tuple(flat_hull_cloud_ptr, flat_polygons_ptr);
@@ -86,7 +102,7 @@ auto GenericHull2D(const typename pcl::PointCloud<T>::Ptr& flat_cloud_ptr,
 CloudAndClusterHulls find_primary_clusters(
     const pcl::PointCloud<pcl::PointXYZL>::Ptr& cloud,
     size_t top_clusters = 200,
-    HullType hull_type = HullTypeConvex)
+    HullType hull_type = HullType::Convex)
 {
     typedef std::uint32_t label_t;
     typedef std::uint32_t counter_t;
@@ -211,7 +227,7 @@ CloudAndClusterHulls find_primary_clusters(
             pcl::PointXYZ p3(p.x, p.y, max_z);
             full_hull_cloud_ptr->push_back(p3);
         }
-        if (hull_type == HullTypeConvex)
+        if (hull_type == HullType::Convex)
         {
             for (const auto& poly : *flat_polygons_ptr)
             {
@@ -226,7 +242,7 @@ CloudAndClusterHulls find_primary_clusters(
             pcl::PointXYZ p3(p.x, p.y, min_z);
             full_hull_cloud_ptr->push_back(p3);
         }
-        if (hull_type == HullTypeConvex)
+        if (hull_type == HullType::Convex)
         {
             for (const auto& poly : *flat_polygons_ptr)
             {
