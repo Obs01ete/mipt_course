@@ -34,7 +34,8 @@
 
 #include "gpsimu_t.h"
 #include "point_cloud_kernels.h"
-#include "constrained_planar_cuts.h"
+// #include "constrained_planar_cuts.h"
+#include "dbscan_segmentation.h"
 #include "clusters_and_hulls.h"
 #include "processor_params.h"
 #include "ransac_ground.h"
@@ -85,7 +86,7 @@ public:
         const pcl::PointCloud<pcl::PointXYZI>::Ptr& input_cloud_ptr,
         const std::unique_ptr<kitti_parser::gpsimu_t>& gpsimu_ptr)
     {
-        // For diagnostic putposes we could peek into the min-max values of
+        // For diagnostic purposes we could peek into the min-max values of
         // points at all three X, Y and Z coordinates.
         if (false)
         {
@@ -184,8 +185,9 @@ public:
         CloudAndClusterHulls cloud_and_cluster_hulls;
         if (m_params->m_do_clusterize)
         {
-            auto cpc_labeled_cloud = constrained_planar_cuts_segmentation<pcl::PointXYZ>(cloud_after_ground_ptr);
-            cloud_and_cluster_hulls = find_primary_clusters(cpc_labeled_cloud);
+            auto dbscan_labeled_cloud = dbscan_segmentation<pcl::PointXYZ>(cloud_after_ground_ptr)    ;
+            // auto cpc_labeled_cloud = constrained_planar_cuts_segmentation<pcl::PointXYZ>(cloud_after_ground_ptr);
+            cloud_and_cluster_hulls = find_primary_clusters(dbscan_labeled_cloud);
         }
         else
         {
