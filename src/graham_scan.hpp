@@ -1,6 +1,8 @@
 #ifndef __GRAHAM_SCAN_H__
 #define __GRAHAM_SCAN_H__
 
+#include <algorithm>
+#include <cmath>
 #include <stack>
 #include <pcl/surface/convex_hull.h>
 
@@ -49,13 +51,76 @@ namespace graham
     }
 
   private:
+    struct compCCW
+    {
+        pcl::index_t i_pivot;
+        const GrahamHull *th;
+
+        compCCW(pcl::index_t idx, const GrahamHull *gr) : i_pivot(idx), th(gr) {}
+
+        double operator()(pcl::index_t i, pcl::index_t j) const
+        {
+          auto &pivot_p = th->get_point(i_pivot);
+          auto &p_i = th->get_point(i);
+          auto &p_j = th->get_point(j);
+
+          auto cross = (pivot_p.x - p_i.x) * (p_j.y - p_i.y) - (pivot_p.y - p_i.y) * (p_j.x - p_i.x);
+
+          return cross;
+        }
+    };
+
     pcl::index_t findP0() const
     {
-      return {};
+      auto cmp_min_point = [this](auto &&li, auto &&ri) -> bool {
+        const auto &l = get_point(li);
+        const auto &r = get_point(ri);
+
+        if (l.y < r.y)
+          return true;
+        if (l.x < r.x)
+          return true;
+        return false;
+      };
+      auto min_it = std::min_element(indices_->begin(), indices_->end(), cmp_min_point);
+
+      return std::distance(indices_->begin(), min_it);
     }
+
     const PointInT &get_point(pcl::index_t index) const
     {
-      return input_->at(indicies_->at(index));
+      return input_->at(index);
+    }
+
+    typename std::vector<pcl::index_t>::iterator remove_collinear(std::vector<pcl::index_t> &indexes) const
+    {
+      auto pivot_p = get_point(indexes.front());
+      auto prev = *std::next(indexes.begin());
+      auto piv_ccw = compCCW(indexes.front(), this);
+
+
+      auto check_dst = [&prev, &piv_ccw, &pivot_p, this](auto &&idx){
+        auto prev_p = get_point(prev);
+        auto cur_p = get_point(idx);
+
+
+        if (std::abs(piv_ccw(prev, idx)) > 1e-6)
+        {
+          prev = idx;
+          return false;
+        }
+
+        auto prev_dst = std::abs(prev_p.x - pivot_p.x) + std::abs(prev_p.y - pivot_p.y);
+        auto cur_dst = std::abs(cur_p.x - pivot_p.x) + std::abs(cur_p.y - pivot_p.y);
+        
+        if (prev_dst < cur_dst)
+          std::swap(idx, prev);
+
+        prev = idx;
+        return true;
+      };
+
+      return std::remove_if(std::next(indexes.begin(), 2), indexes.end(), check_dst);
     }
 
     void performReconstruction(PointCloud &points, std::vector<pcl::Vertices> &polygons,
@@ -66,42 +131,31 @@ namespace graham
       // Graham scan
       auto P0_index_index = findP0();
 
-      auto indexes = *indicies_;
-      std::swap((*indexes)[0], (*indexes)[P0_index_index]);
-      stack.push_back(indicies_->front());
+      auto indexes = *indices_;
+      std::swap(indexes[0], indexes[P0_index_index]);
 
-      struct compCCW
-      {
-        index_t i_pivot;
+      stack.push_back(indexes.front());
 
-        bool operator()(index_t i, index_t j) const
-        {
-          auto &pivot_p = get_point(i_pivot);
-          auto &p_i = get_point(i);
-          auto &p_j = get_point(j);
+      auto comp_p0 = compCCW(indexes.front(), this);
 
-          auto cross = (pivot_p.x - p_i.x) * (p_j.y - p_i.y) - (pivot_p.y - p_i.y) * (p_j.x - p_i.y);
+      std::sort(indexes.begin() + 1, indexes.end(), [&comp_p0](auto i, auto j) { return comp_p0(i, j) > 1e-6; });
 
-          return cross > 0;
-        }
-      };
+      auto new_end = remove_collinear(indexes);
 
-      std::sort(indexes.begin() + 1, indexes.end(), compCCW(P0_index));
+      indexes.erase(new_end, indexes.end());
 
-      // remove_collinear()
-
-      stack.push_back(indicies_->at(1));
+      stack.push_back(indexes[1]);
       for (auto it = indexes.begin() + 2; it != indexes.end(); ++it) 
       {
 
-        for (;;)
+        while (stack.size() > 1)
         {
           auto top = stack.back();
           auto next_to_top = *std::prev(stack.end(), 2);
 
-          auto ccw = compCCW(next_to_top);
+          auto ccw = compCCW(next_to_top, this);
 
-          if (stack.size() <= 1 || ccw(top, *it))
+          if (ccw(*it, top) > 1e-6)
             break;
 
           stack.pop_back();
@@ -112,11 +166,11 @@ namespace graham
 
       points.reserve(stack.size());
       polygons.resize(1);
-      polygons[0].reserve(stack.size())
+      polygons[0].vertices.reserve(stack.size());
       for (auto idx : stack)
       {
-        polygons[0].push_back(points.size());
-        points.push_back(input_->at(idx))
+        polygons[0].vertices.push_back(points.size());
+        points.push_back(input_->at(idx));
       }
     }
   };

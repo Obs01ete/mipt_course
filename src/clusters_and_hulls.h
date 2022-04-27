@@ -213,7 +213,7 @@ CloudAndClusterHulls find_primary_clusters(
         auto flat_hull_cloud_ptr = std::make_shared<pcl::PointCloud<pcl::PointXYZ> >();
         auto flat_polygons_ptr = std::make_shared<std::vector<pcl::Vertices> >();
         std::tie(flat_hull_cloud_ptr, flat_polygons_ptr) =
-            GenericHull2D<pcl::PointXYZ>(flat_cloud_ptr, hull_type);
+            GenericHull2D<pcl::PointXYZ>(flat_cloud_ptr, hull_type, ConvexType::Graham);
 
         auto full_hull_cloud_ptr = std::make_shared<pcl::PointCloud<pcl::PointXYZ> >();
         auto full_polygons_ptr = std::make_shared<std::vector<pcl::Vertices> >();
