@@ -51,17 +51,13 @@ enum HullType
     Concave
 };
 
-enum class ConvexType
-{
-    Std,
-    Graham
-};
+
 
 
 // A function that multiplexes convex and concave 2D hulls
 template<typename T>
 auto GenericHull2D(const typename pcl::PointCloud<T>::Ptr& flat_cloud_ptr,
-    HullType hull_type, ConvexType conv_type = ConvexType::Std, float alpha = 0.9f)
+    HullType hull_type, float alpha = 0.9f)
 {
     auto flat_hull_cloud_ptr = std::make_shared<pcl::PointCloud<pcl::PointXYZ> >();
     auto flat_polygons_ptr = std::make_shared<std::vector<pcl::Vertices> >();
@@ -77,7 +73,7 @@ auto GenericHull2D(const typename pcl::PointCloud<T>::Ptr& flat_cloud_ptr,
     }
     else
     {
-        if (conv_type == ConvexType::Std)
+        if (CONV_TYPE == ConvexType::Std)
         {
             pcl::ConvexHull<pcl::PointXYZ> convex_hull;
             convex_hull.setInputCloud(flat_cloud_ptr);
@@ -213,7 +209,7 @@ CloudAndClusterHulls find_primary_clusters(
         auto flat_hull_cloud_ptr = std::make_shared<pcl::PointCloud<pcl::PointXYZ> >();
         auto flat_polygons_ptr = std::make_shared<std::vector<pcl::Vertices> >();
         std::tie(flat_hull_cloud_ptr, flat_polygons_ptr) =
-            GenericHull2D<pcl::PointXYZ>(flat_cloud_ptr, hull_type, ConvexType::Graham);
+            GenericHull2D<pcl::PointXYZ>(flat_cloud_ptr, hull_type);
 
         auto full_hull_cloud_ptr = std::make_shared<pcl::PointCloud<pcl::PointXYZ> >();
         auto full_polygons_ptr = std::make_shared<std::vector<pcl::Vertices> >();

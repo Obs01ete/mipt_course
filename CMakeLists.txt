@@ -25,3 +25,8 @@ SET(COMPILE_FLAGS "-std=c++14 -Wno-deprecated")
 add_definitions(${COMPILE_FLAGS})
 
 set(CMAKE_BUILD_TYPE Debug)
+
+# TEST
+add_executable(test_gr test/graham/graham.cpp)
+target_link_libraries(test_gr ${PCL_LIBRARIES})
+target_include_directories(test_gr PRIVATE src/)

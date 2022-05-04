@@ -28,6 +28,7 @@
 
 namespace lidar_course {
 
+ConvexType CONV_TYPE = ConvexType::Graham;
 
 Visualizer::Visualizer(std::shared_ptr<ProcessorParams>& param_ptr) :
     m_params(param_ptr),
@@ -125,6 +126,11 @@ void Visualizer::keyboardEventOccurred(
         case (int) '7':
             pthis->m_params->setDecimationCoef(pthis->m_params->m_decimation_coef + 1);
             break;
+        case (int) '8':
+        case (int) 'g':
+        case (int) 'G':
+            CONV_TYPE = CONV_TYPE == ConvexType::Std ? ConvexType::Graham : ConvexType::Std;
+            break;
         case (int) 'd':
         case (int) 'D':
             pthis->m_show_help = !pthis->m_show_help;
@@ -168,6 +174,10 @@ void Visualizer::printText(std::shared_ptr<pcl::visualization::PCLVisualizer> vi
     top -= space;
     temp = "(6-7) Decrease-increase decimation coefficient";
     viewer_arg->addText(temp, 5, top, font_size, 1, 1, 1, "decim_text");
+
+    top -= space;
+    temp = CONV_TYPE == ConvexType::Std ? "(8) Enable Graham scan" : "(8) Disable Graham scan";
+    viewer_arg->addText(temp, 5, top, font_size, 1, 1, 1, "graham_text");
 
     top -= space;
     temp = "(S) Run / stop";

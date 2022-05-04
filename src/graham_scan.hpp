@@ -138,7 +138,7 @@ namespace graham
 
       auto comp_p0 = compCCW(indexes.front(), this);
 
-      std::sort(indexes.begin() + 1, indexes.end(), [&comp_p0](auto i, auto j) { return comp_p0(i, j) > 1e-6; });
+      std::sort(indexes.begin() + 1, indexes.end(), [&comp_p0](auto i, auto j) { return comp_p0(i, j) < 0; });
 
       auto new_end = remove_collinear(indexes);
 
@@ -155,7 +155,7 @@ namespace graham
 
           auto ccw = compCCW(next_to_top, this);
 
-          if (ccw(*it, top) > 1e-6)
+          if (ccw(*it, top) > 0)
             break;
 
           stack.pop_back();
