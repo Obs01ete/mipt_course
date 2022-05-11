@@ -34,6 +34,13 @@
 namespace lidar_course {
 
 
+enum class ConvexType
+{
+    Std,
+    Graham
+};
+extern ConvexType CONV_TYPE;
+
 // This struct keeps the description of everything that relates to a cluster.
 struct ClusterWithHull
 {
