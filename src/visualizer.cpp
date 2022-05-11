@@ -152,7 +152,7 @@ void Visualizer::printText(std::shared_ptr<pcl::visualization::PCLVisualizer> vi
     std::string off_str = "OFF";
     int font_size = 13;
     int space = 15;
-    int top = 120;
+    int top = 135;
 
     viewer_arg->addText("Press (1-n) to show different elements",
         5, top, font_size+2, 1, 1, 1, "hud_text");
