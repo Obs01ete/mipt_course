@@ -27,7 +27,7 @@ int main()
   for (auto idx : flat_polygons_ptr->at(0).vertices)
   {
     auto pt = flat_hull_cloud_ptr->at(idx);
-    std::cout << pt.x << " " << pt.y << " " << pt.z << std::endl;
+    std::cout << pt << std::endl;
   }
   return 0;
 }
