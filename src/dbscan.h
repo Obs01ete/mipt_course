@@ -44,7 +44,7 @@ public:
                 continue;
 
             bool is_noise = expand_cluster(point, labels_queue, cluster_id);
-            
+
             while (labels_queue.size() > 0) {
                 size_t cur_label = labels_queue.front();
                 labels_queue.pop();
@@ -53,7 +53,7 @@ public:
                 expand_cluster(neighbor, labels_queue, cluster_id);
             }
             if (!is_noise)
-                cluster_id++;
+                ++cluster_id;
         }
 
         return label_point_cloud;
