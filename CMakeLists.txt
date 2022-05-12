@@ -25,3 +25,9 @@ SET(COMPILE_FLAGS "-std=c++14 -Wno-deprecated")
 add_definitions(${COMPILE_FLAGS})
 
 set(CMAKE_BUILD_TYPE Debug)
+
+## Add dbscan test
+
+add_executable(test_dbscan test/dbscan/dbscan_test.cpp)
+target_link_libraries(test_dbscan ${PCL_LIBRARIES})
+target_include_directories(test_dbscan PRIVATE src/)
