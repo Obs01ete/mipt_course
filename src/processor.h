@@ -31,6 +31,7 @@
 #include <cstdint>
 
 #include <Eigen/Geometry>
+#include "dbscan.h"
 
 #include "gpsimu_t.h"
 #include "point_cloud_kernels.h"
@@ -38,6 +39,7 @@
 #include "clusters_and_hulls.h"
 #include "processor_params.h"
 #include "ransac_ground.h"
+
 
 
 namespace lidar_course {
@@ -184,8 +186,10 @@ public:
         CloudAndClusterHulls cloud_and_cluster_hulls;
         if (m_params->m_do_clusterize)
         {
-            auto cpc_labeled_cloud = constrained_planar_cuts_segmentation<pcl::PointXYZ>(cloud_after_ground_ptr);
-            cloud_and_cluster_hulls = find_primary_clusters(cpc_labeled_cloud);
+            // вот сюда надо вставить dbscan
+            auto dbscan_labeled_cloud = lidar_cource::Dbscan<pcl::PointXYZ>(cloud_after_ground_ptr);
+            // auto cpc_labeled_cloud = constrained_planar_cuts_segmentation<pcl::PointXYZ>(cloud_after_ground_ptr);
+            cloud_and_cluster_hulls = find_primary_clusters(dbscan_labeled_cloud);
         }
         else
         {
