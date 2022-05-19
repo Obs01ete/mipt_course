@@ -18,7 +18,7 @@ target_link_libraries(process-pcd ${PCL_LIBRARIES})
 add_executable(bin-to-pcd src/bin_to_pcd.cpp)
 target_link_libraries(bin-to-pcd ${PCL_LIBRARIES})
 
-add_executable(process-sequence src/process_sequence.cpp src/visualizer.cpp)
+add_executable(process-sequence src/process_sequence.cpp src/visualizer.cpp src/dbscan.cpp)
 target_link_libraries(process-sequence ${PCL_LIBRARIES} pthread png)
 
 SET(COMPILE_FLAGS "-std=c++14 -Wno-deprecated")
