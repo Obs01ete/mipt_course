@@ -29,7 +29,7 @@
 #include <pcl/surface/concave_hull.h>
 
 #include "interface_types.h"
-#include "graham_scan.h"
+#include "graham_hull.h"
 
 
 namespace {
@@ -70,12 +70,9 @@ auto GenericHull2D(const typename pcl::PointCloud<T>::Ptr& flat_cloud_ptr,
     }
     else if (convex_type == ConvexType::Graham) // hull_type == HullType::Convex
     {
-        std::cerr << "FOR DEBUG\n"; // still Standard algorithm is used
-
-        pcl::ConvexHull<pcl::PointXYZ> convex_hull;
+        GrahamHull<pcl::PointXYZ> convex_hull;
         convex_hull.setInputCloud(flat_cloud_ptr);
-        convex_hull.setDimension(2);
-        convex_hull.reconstruct(*flat_hull_cloud_ptr, *flat_polygons_ptr);
+        convex_hull.reconstruct(*flat_hull_cloud_ptr, *flat_polygons_ptr); // implemented 2D algorithm as default
     }
 
     return std::make_tuple(flat_hull_cloud_ptr, flat_polygons_ptr);
