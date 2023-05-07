@@ -80,12 +80,11 @@ std::vector<size_t> find_inlier_indices(
     // Once the point cloud is transformed into the plane coordinates,
     // We can apply a simple criterion on Z coordinate to find inliers.
     std::vector<size_t> indices;
-    for (size_t i_point = 0; i_point < aligned_cloud_ptr->size(); i_point++)
+    for (const auto& p : *aligned_cloud_ptr)
     {
-        const auto& p = (*aligned_cloud_ptr)[i_point];
         if (condition_z_fn(p.z))
         {
-            indices.push_back(i_point);
+            indices.push_back(&p - &(*aligned_cloud_ptr)[0]);
         }
     }
     return indices;
