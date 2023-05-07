@@ -207,8 +207,7 @@ auto remove_ground_ransac(
         std::unordered_set<size_t> inlier_set(inlier_indices.begin(), inlier_indices.end());
         for (size_t i_point = 0; i_point < input_cloud_ptr->size(); i_point++)
         {
-            bool extract_non_ground = true;
-            if ((inlier_set.find(i_point) == inlier_set.end()) == extract_non_ground)
+            if (!inlier_set.count(i_point))
             {
                 const auto& p = (*input_cloud_ptr)[i_point];
                 cloud_no_ground_ptr->push_back(p);
