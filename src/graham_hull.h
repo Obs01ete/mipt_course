@@ -122,12 +122,12 @@ private:
         return x * x + y * y;
     }
 
-    struct AndleComparator
+    struct AngleComparator
     {
         pcl::index_t comp_point_index;
         const GrahamHull *hull;
 
-        AndleComparator(pcl::index_t idx, const GrahamHull *hull) :
+        AngleComparator(pcl::index_t idx, const GrahamHull *hull) :
             comp_point_index(idx),
             hull(hull)
         {}
@@ -182,7 +182,7 @@ private:
         std::swap(indexes[0], indexes[start_point_index]);
         stack.push_back(indexes.front());
 
-        auto comparator = AndleComparator(indexes.front(), this);
+        auto comparator = AngleComparator(indexes.front(), this);
 
         std::sort(indexes.begin() + 1, indexes.end(), [&comparator, this](auto point_index_1, auto point_index_2)
         {
@@ -202,7 +202,7 @@ private:
                 auto top = stack.back();
                 auto next_to_top = *std::prev(stack.end(), 2);
 
-                auto comparator = AndleComparator(next_to_top, this);
+                auto comparator = AngleComparator(next_to_top, this);
                 auto comp_res = comparator(*it, top);
                 if (comp_res == AngleCompResult::MoreAngle || comp_res == AngleCompResult::Collinear)
                     break;
@@ -217,10 +217,10 @@ private:
         polygons.resize(1);
         polygons[0].vertices.reserve(stack.size());
 
-        for (auto idx : stack)
+        for (auto it : stack)
         {
             polygons[0].vertices.push_back(points.size());
-            points.push_back(input_->at(idx));
+            points.push_back(input_->at(it));
         }
     }
 };
