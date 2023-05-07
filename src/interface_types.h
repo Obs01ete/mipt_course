@@ -34,6 +34,20 @@
 namespace lidar_course {
 
 
+// Choice between convex and concave hull
+enum class HullType
+{
+    Convex,
+    Concave,
+};
+
+enum class ConvexType
+{
+    Graham,
+    Standard,
+    Undefined // for HullType that is not Convex
+};
+
 // This struct keeps the description of everything that relates to a cluster.
 struct ClusterWithHull
 {

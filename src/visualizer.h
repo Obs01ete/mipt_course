@@ -59,7 +59,7 @@ public:
 
 private:
     static void keyboardEventOccurred(const pcl::visualization::KeyboardEvent& event_arg, void* pv_this);
-    static void printText(std::shared_ptr<pcl::visualization::PCLVisualizer> viewer_arg);
+    static void printText(std::shared_ptr<pcl::visualization::PCLVisualizer> viewer_arg, void* pv_this);
     static void removeText(std::shared_ptr<pcl::visualization::PCLVisualizer> viewer_arg);
 };
 
