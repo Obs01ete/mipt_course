@@ -73,7 +73,7 @@ void Visualizer::show(const CloudAndClusterHulls& cloud_and_clusters)
 
     if (m_show_help)
     {
-        printText(m_viewer);
+        printText(m_viewer, this);
     }
     else
     {
@@ -125,6 +125,10 @@ void Visualizer::keyboardEventOccurred(
         case (int) '7':
             pthis->m_params->setDecimationCoef(pthis->m_params->m_decimation_coef + 1);
             break;
+        case (int) '8':
+            pthis->m_params->setConvexType(pthis->m_params->m_convex_type == ConvexType::Standard ?
+                ConvexType::Graham : ConvexType::Standard);
+            break;
         case (int) 'd':
         case (int) 'D':
             pthis->m_show_help = !pthis->m_show_help;
@@ -140,13 +144,17 @@ void Visualizer::keyboardEventOccurred(
 }
 
 
-void Visualizer::printText(std::shared_ptr<pcl::visualization::PCLVisualizer> viewer_arg)
+void Visualizer::printText(
+    std::shared_ptr<pcl::visualization::PCLVisualizer> viewer_arg,
+    void* pv_this)
 {
+    Visualizer* pthis = (Visualizer*)pv_this;
+
     std::string on_str = "ON";
     std::string off_str = "OFF";
     int font_size = 13;
     int space = 15;
-    int top = 120;
+    int top = space * 9;
 
     viewer_arg->addText("Press (1-n) to show different elements",
         5, top, font_size+2, 1, 1, 1, "hud_text");
@@ -168,6 +176,10 @@ void Visualizer::printText(std::shared_ptr<pcl::visualization::PCLVisualizer> vi
     top -= space;
     temp = "(6-7) Decrease-increase decimation coefficient";
     viewer_arg->addText(temp, 5, top, font_size, 1, 1, 1, "decim_text");
+
+    top -= space;
+    temp = pthis->m_params->m_convex_type == ConvexType::Standard ? "(8) Enable Graham scan" : "(8) Enable Standard scan";
+    viewer_arg->addText(temp, 5, top, font_size, 1, 1, 1, "graham_text");
 
     top -= space;
     temp = "(S) Run / stop";

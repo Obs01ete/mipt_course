@@ -25,6 +25,8 @@
 
 #pragma once
 
+#include "interface_types.h"
+
 
 namespace lidar_course {
 
@@ -43,17 +45,25 @@ struct ProcessorParams
     std::atomic<bool> m_remove_ground;
     std::atomic<size_t> m_num_clouds;
     std::atomic<bool> m_do_clusterize;
+    std::atomic<ConvexType> m_convex_type;
 
     ProcessorParams(size_t decimation_coef,
                     bool remove_ground,
                     size_t num_clouds,
-                    bool do_clusterize) :
+                    bool do_clusterize,
+                    ConvexType convex_type = ConvexType::Standard) :
 
         m_remove_ground(remove_ground),
-        m_do_clusterize(do_clusterize)
+        m_do_clusterize(do_clusterize),
+        m_convex_type(convex_type)
     {
         setDecimationCoef(decimation_coef);
         setNumClouds(num_clouds);
+    }
+
+    void setConvexType(ConvexType convex_type)
+    {
+        m_convex_type = convex_type;
     }
 
     void setDecimationCoef(size_t decimation_coef)

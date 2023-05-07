@@ -29,6 +29,7 @@
 #include <pcl/surface/concave_hull.h>
 
 #include "interface_types.h"
+#include "graham_hull.h"
 
 
 namespace {
@@ -44,23 +45,15 @@ namespace {
 namespace lidar_course {
 
 
-// Choice between convex and concave hull
-enum HullType
-{
-    HullTypeConvex,
-    HullTypeConcave
-};
-
-
 // A function that multiplexes convex and concave 2D hulls
 template<typename T>
 auto GenericHull2D(const typename pcl::PointCloud<T>::Ptr& flat_cloud_ptr,
-    HullType hull_type, float alpha = 0.9f)
+    HullType hull_type, ConvexType convex_type = ConvexType::Undefined, float alpha = 0.9f)
 {
     auto flat_hull_cloud_ptr = std::make_shared<pcl::PointCloud<pcl::PointXYZ> >();
     auto flat_polygons_ptr = std::make_shared<std::vector<pcl::Vertices> >();
 
-    if (hull_type == HullTypeConcave)
+    if (hull_type == HullType::Concave)
     {
         pcl::ConcaveHull<pcl::PointXYZ> concave_hull;
         concave_hull.setInputCloud(flat_cloud_ptr);
@@ -68,12 +61,18 @@ auto GenericHull2D(const typename pcl::PointCloud<T>::Ptr& flat_cloud_ptr,
         concave_hull.setDimension(2);
         concave_hull.reconstruct(*flat_hull_cloud_ptr, *flat_polygons_ptr);
     }
-    else
+    else if (convex_type == ConvexType::Standard) // hull_type == HullType::Convex
     {
         pcl::ConvexHull<pcl::PointXYZ> convex_hull;
         convex_hull.setInputCloud(flat_cloud_ptr);
         convex_hull.setDimension(2);
         convex_hull.reconstruct(*flat_hull_cloud_ptr, *flat_polygons_ptr);
+    }
+    else if (convex_type == ConvexType::Graham) // hull_type == HullType::Convex
+    {
+        GrahamHull<pcl::PointXYZ> convex_hull;
+        convex_hull.setInputCloud(flat_cloud_ptr);
+        convex_hull.reconstruct(*flat_hull_cloud_ptr, *flat_polygons_ptr); // implemented 2D algorithm as default
     }
 
     return std::make_tuple(flat_hull_cloud_ptr, flat_polygons_ptr);
@@ -85,8 +84,9 @@ auto GenericHull2D(const typename pcl::PointCloud<T>::Ptr& flat_cloud_ptr,
 // a Z-cylindrical convex hull for each cluster.
 CloudAndClusterHulls find_primary_clusters(
     const pcl::PointCloud<pcl::PointXYZL>::Ptr& cloud,
-    size_t top_clusters = 200,
-    HullType hull_type = HullTypeConvex)
+    HullType hull_type = HullType::Convex,
+    ConvexType convex_type = ConvexType::Standard,
+    size_t top_clusters = 200)
 {
     typedef std::uint32_t label_t;
     typedef std::uint32_t counter_t;
@@ -112,7 +112,7 @@ CloudAndClusterHulls find_primary_clusters(
         counts_vec.push_back(element);
     }
 
-    // Sort the cluster stats descending, preserving the labels. 
+    // Sort the cluster stats descending, preserving the labels.
     std::sort(counts_vec.begin(), counts_vec.end(), [](auto elem1, auto elem2) {
         return elem1.second > elem2.second;
         });
@@ -197,7 +197,7 @@ CloudAndClusterHulls find_primary_clusters(
         auto flat_hull_cloud_ptr = std::make_shared<pcl::PointCloud<pcl::PointXYZ> >();
         auto flat_polygons_ptr = std::make_shared<std::vector<pcl::Vertices> >();
         std::tie(flat_hull_cloud_ptr, flat_polygons_ptr) =
-            GenericHull2D<pcl::PointXYZ>(flat_cloud_ptr, hull_type);
+            GenericHull2D<pcl::PointXYZ>(flat_cloud_ptr, hull_type, convex_type);
 
         auto full_hull_cloud_ptr = std::make_shared<pcl::PointCloud<pcl::PointXYZ> >();
         auto full_polygons_ptr = std::make_shared<std::vector<pcl::Vertices> >();
@@ -211,7 +211,7 @@ CloudAndClusterHulls find_primary_clusters(
             pcl::PointXYZ p3(p.x, p.y, max_z);
             full_hull_cloud_ptr->push_back(p3);
         }
-        if (hull_type == HullTypeConvex)
+        if (hull_type == HullType::Convex)
         {
             for (const auto& poly : *flat_polygons_ptr)
             {
@@ -226,7 +226,7 @@ CloudAndClusterHulls find_primary_clusters(
             pcl::PointXYZ p3(p.x, p.y, min_z);
             full_hull_cloud_ptr->push_back(p3);
         }
-        if (hull_type == HullTypeConvex)
+        if (hull_type == HullType::Convex)
         {
             for (const auto& poly : *flat_polygons_ptr)
             {

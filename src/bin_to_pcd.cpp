@@ -57,7 +57,7 @@ int main()
 
 	std::cout << "points->size() = " << points->size() << std::endl;
 
-	std::cout << "Read KTTI point cloud with " << points->size() <<
+	std::cout << "Read KITTI point cloud with " << points->size() <<
 	    " points, writing to " << outfile << std::endl;
     pcl::PCDWriter writer;
     writer.write<pcl::PointXYZI>(outfile, *points, false);
