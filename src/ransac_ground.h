@@ -90,54 +90,94 @@ std::vector<size_t> find_inlier_indices(
     return indices;
 }
 
-
-// This function performs plane detection with RANSAC sampling of planes
-// that lie on triplets of points randomly sampled from the cloud.
-// Among all trials the plane that is picked is the one that has the highest
-// number of inliers. Inlier points are then removed as belonging to the ground.
-auto remove_ground_ransac(
-    pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud_ptr)
-{
-    // Threshold for rough point dropping by Z coordinate (meters)
-    const float rough_filter_thr = 0.5f;
-    // How much to decimate the input cloud for RANSAC sampling and inlier counting
-    const size_t decimation_rate = 10;
-
-    // Tolerance threshold on the distance of an inlier to the plane (meters)
-    const float ransac_tolerance = 0.1f;
-    // After the final plane is found this is the threshold below which all
-    // points are discarded as belonging to the ground.
-    const float remove_ground_threshold = 0.2f;
-
-    // To reduce the number of outliers (non-ground points) we can roughly crop
-    // the point cloud by Z coordinate in the range (-rough_filter_thr, rough_filter_thr).
-    // Simultaneously we perform decimation of the remaining points since the full
-    // point cloud is excessive for RANSAC.
-    std::mt19937::result_type decimation_seed = 41;
-    std::mt19937 rng_decimation(decimation_seed);
-    auto decimation_gen = std::bind(
-        std::uniform_int_distribution<size_t>(0, decimation_rate), rng_decimation);
-
-    auto filtered_ptr = std::make_shared<pcl::PointCloud<pcl::PointXYZ> >();
-    for (const auto& p : *input_cloud_ptr)
+/**
+ * To reduce the number of outliers (non-ground points) we can roughly crop
+ * the point cloud by Z coordinate in the range (-rough_filter_thr, rough_filter_thr).
+ * Simultaneously we perform decimation of the remaining points since the full
+ * point cloud is excessive for RANSAC.
+ *
+ * @param input_cloud_ptr Point cloud
+ * @param decimation_rate Tolerance threshold on the distance of an inlier to the plane (meters)
+ * @param rough_filter_thr Threshold for rough point dropping by Z coordinate (meters)
+ * @return
+ */
+    auto crop_and_decimate_pcl(
+            pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud_ptr,
+            const size_t decimation_rate,
+            const float rough_filter_thr)
     {
-        if ((p.z > -rough_filter_thr) && (p.z < rough_filter_thr))
+        std::mt19937::result_type decimation_seed = 41;
+        std::mt19937 rng_decimation(decimation_seed);
+        auto decimation_gen = std::bind(
+                std::uniform_int_distribution<size_t>(0, decimation_rate), rng_decimation);
+
+        auto filtered_ptr = std::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
+        for (const auto& p : *input_cloud_ptr)
         {
-            // Use random number generator to avoid introducing patterns
-            // (which are possible with structured subsampling
-            // like picking each Nth point).
-            if (decimation_gen() == 0)
+            if ((p.z > -rough_filter_thr) && (p.z < rough_filter_thr))
             {
-                filtered_ptr->push_back(p);
+                // Use random number generator to avoid introducing patterns
+                // (which are possible with structured subsampling
+                // like picking each Nth point).
+                if (decimation_gen() == 0)
+                {
+                    filtered_ptr->push_back(p);
+                }
             }
         }
+        return filtered_ptr;
     }
+
+/**
+ * Here we figure out the normal to the plane which can be easily calculated
+ * as a normalized cross product.
+ *
+ * @param three_points points from which plane will be received
+ * @return
+ */
+    auto plane_from_points(std::vector<Eigen::Vector3f> three_points) {
+        auto root_point = three_points[0];
+        auto vb = three_points[1] - root_point;
+        auto vc = three_points[2] - root_point;
+        Eigen::Vector3f normal = vb.cross(vc).normalized();
+
+        // Flip the normal if points down
+        if (normal.dot(Eigen::Vector3f::UnitZ()) < 0)
+        {
+            normal = -normal;
+        }
+        Plane plane{root_point, normal};
+        return plane;
+    }
+
+/**
+ * This function performs plane detection with RANSAC sampling of planes
+ * that lie on triplets of points randomly sampled from the cloud.
+ * Among all trials the plane that is picked is the one that has the highest
+ * number of inliers. Inlier points are then removed as belonging to the ground.
+ *
+ * @param input_cloud_ptr Point cloud
+ * @param remove_ground_threshold How much to decimate the input cloud for RANSAC sampling and inlier counting
+ * @param decimation_rate Tolerance threshold on the distance of an inlier to the plane (meters)
+ * @param rough_filter_thr Threshold for rough point dropping by Z coordinate (meters)
+ * @param ransac_tolerance After the final plane is found this is the threshold below which all points are discarded as
+ * belonging to the ground.
+ * @return
+ */
+auto remove_ground_ransac(
+        pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud_ptr,
+        const float remove_ground_threshold = 0.2f,
+        const size_t decimation_rate = 10,
+        const float rough_filter_thr = 0.5f,
+        const float ransac_tolerance = 0.1f)
+{
+    auto filtered_ptr = crop_and_decimate_pcl(input_cloud_ptr, decimation_rate, rough_filter_thr);
 
     // We need a random number generator for sampling triplets of points.
     std::mt19937::result_type sampling_seed = 42;
     std::mt19937 sampling_rng(sampling_seed);
     auto random_index_gen = std::bind(
-        std::uniform_int_distribution<size_t>(0, filtered_ptr->size()), sampling_rng);
+            std::uniform_int_distribution<size_t>(0, filtered_ptr->size()), sampling_rng);
 
     // Number of RANSAC trials
     const size_t num_iterations = 25;
@@ -148,24 +188,12 @@ auto remove_ground_ransac(
     {
         // Sample 3 random points.
         // pa is special in the sense that is becomes an anchor - a base_point of the plane
-        Eigen::Vector3f pa = (*filtered_ptr)[random_index_gen()].getVector3fMap();
-        Eigen::Vector3f pb = (*filtered_ptr)[random_index_gen()].getVector3fMap();
-        Eigen::Vector3f pc = (*filtered_ptr)[random_index_gen()].getVector3fMap();
-
-        // Here we figure out the normal to the plane which can be easily calculated
-        // as a normalized cross product.
-        auto vb = pb - pa;
-        auto vc = pc - pa;
-        Eigen::Vector3f normal = vb.cross(vc).normalized();
-
-        // Flip the normal if points down
-        if (normal.dot(Eigen::Vector3f::UnitZ()) < 0)
-        {
-            normal = -normal;
+        std::vector<Eigen::Vector3f> rand3_points(3);
+        for (auto& p : rand3_points) {
+            p = (*filtered_ptr)[random_index_gen()].getVector3fMap();
         }
 
-        Plane plane{pa, normal};
-
+        Plane plane = plane_from_points(rand3_points);
         // Call find_inlier_indices to retrieve inlier indices.
         // We will need only the number of inliers.
         auto inlier_indices = find_inlier_indices(filtered_ptr, plane,
