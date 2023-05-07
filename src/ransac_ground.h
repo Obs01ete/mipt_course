@@ -46,7 +46,6 @@ struct Plane
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
-
 // This helper function finds indices of points that are considered inliers,
 // given a plane description and a condition on distance from the plane.
 std::vector<size_t> find_inlier_indices(
@@ -56,13 +55,10 @@ std::vector<size_t> find_inlier_indices(
 {
     using Transform3f = Eigen::Transform<float, 3, Eigen::Affine, Eigen::DontAlign>;
 
-    auto base_point = plane.base_point;
-    auto normal = plane.normal;
-
     // Before rotation of the coordinate frame we need to relocate the point cloud to
     // the position of base_point of the plane.
     Transform3f world_to_ransac_base = Transform3f::Identity();
-    world_to_ransac_base.translate(-base_point);
+    world_to_ransac_base.translate(-plane.base_point);
     auto ransac_base_cloud_ptr = std::make_shared<pcl::PointCloud<pcl::PointXYZ> >();
     pcl::transformPointCloud(*input_cloud_ptr, *ransac_base_cloud_ptr, world_to_ransac_base);
 
@@ -70,7 +66,7 @@ std::vector<size_t> find_inlier_indices(
     // which is required to rotate a coordinate system that plane's normal
     // becomes aligned with Z coordinate axis.
     auto rotate_to_plane_quat = Eigen::Quaternionf::FromTwoVectors(
-        normal,
+        plane.normal,
         Eigen::Vector3f::UnitZ()
     ).normalized();
 
