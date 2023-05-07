@@ -54,7 +54,7 @@ std::vector<size_t> find_inlier_indices(
     const Plane& plane,
     std::function<bool(float)> condition_z_fn)
 {
-    typedef Eigen::Transform<float, 3, Eigen::Affine, Eigen::DontAlign> Transform3f;
+    using Transform3f = Eigen::Transform<float, 3, Eigen::Affine, Eigen::DontAlign>;
 
     auto base_point = plane.base_point;
     auto normal = plane.normal;
@@ -147,7 +147,7 @@ auto remove_ground_ransac(
     // Number of RANSAC trials
     const size_t num_iterations = 25;
     // The best plane is determined by a pair of (number of inliers, plane specification)
-    typedef std::pair<size_t, Plane> BestPair;
+    using BestPair = std::pair<size_t, Plane>;
     auto best = std::unique_ptr<BestPair>();
     for (size_t i_iter = 0; i_iter < num_iterations; i_iter++)
     {
