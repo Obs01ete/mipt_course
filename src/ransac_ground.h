@@ -104,7 +104,7 @@ std::vector<size_t> find_inlier_indices(
  * @return
  */
 auto crop_and_decimate_pcl(
-        pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud_ptr,
+        const pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud_ptr,
         const size_t decimation_rate,
         const float rough_filter_thr)
 {
@@ -137,7 +137,6 @@ auto crop_and_decimate_pcl(
  * @param three_points points from which plane will be received
  * @return
  */
-
 auto plane_from_points(const std::vector<Eigen::Vector3f>& three_points)
 {
     auto root_point = three_points[0];
@@ -165,6 +164,37 @@ size_t count_num_of_ransac_iters(const double inlier_fraction, const double rans
 {
     const double result = std::log(1 - ransac_precision) / std::log(1 - std::pow(inlier_fraction, 3));
     return std::lround(result);
+}
+
+/**
+ * For the best plane filter out all the points that are below the plane + remove_ground_threshold.
+ *
+ * @param input_cloud_ptr Point cloud
+ * @param plane Plane
+ * @param remove_ground_threshold How much to decimate the input cloud for RANSAC sampling and inlier counting
+ * @return
+ */
+auto pcl_without_inliers(
+    const pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud_ptr,
+    const Plane& plane,
+    const float remove_ground_threshold)
+{
+    auto cloud_no_ground_ptr = std::make_shared<pcl::PointCloud<pcl::PointXYZ> >();
+    auto inlier_indices = find_inlier_indices(input_cloud_ptr, plane,
+          [remove_ground_threshold](float z) -> bool {
+              return z <= remove_ground_threshold;
+          });
+    std::unordered_set<size_t> inlier_set(inlier_indices.begin(), inlier_indices.end());
+    for (size_t i_point = 0; i_point < input_cloud_ptr->size(); i_point++)
+    {
+        bool extract_non_ground = true;
+        if ((inlier_set.find(i_point) == inlier_set.end()) == extract_non_ground)
+        {
+            const auto& p = (*input_cloud_ptr)[i_point];
+            cloud_no_ground_ptr->push_back(p);
+        }
+    }
+    return cloud_no_ground_ptr;
 }
 
 /**
@@ -200,7 +230,6 @@ auto remove_ground_ransac(
     auto random_index_gen = std::bind(
             std::uniform_int_distribution<size_t>(0, filtered_ptr->size()), sampling_rng);
 
-    // Number of RANSAC trials
     const size_t num_iterations = count_num_of_ransac_iters(inlier_fraction, ransac_precision);
     // The best plane is determined by a pair of (number of inliers, plane specification)
     using BestPair = std::pair<size_t, Plane>;
@@ -221,54 +250,11 @@ auto remove_ground_ransac(
             [ransac_tolerance](float z) -> bool {
                 return (z >= -ransac_tolerance) && (z <= ransac_tolerance);
             });
-
         // If new best plane is found, update the best
-        bool found_new_best = false;
-        if (best)
-        {
-            if (inlier_indices.size() > best->first)
-            {
-                found_new_best = true;
-            }
-        }
-        else
-        {
-            // For the first trial update anyway
-            found_new_best = true;
-        }
-
-        if (found_new_best)
-        {
+        if (best == nullptr || inlier_indices.size() > best->first)
             best = std::unique_ptr<BestPair>(new BestPair{inlier_indices.size(), plane});
-        }
     }
-
-    // For the best plane filter out all the points that are
-    // below the plane + remove_ground_threshold.
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_no_ground_ptr;
-    if (best)
-    {
-        cloud_no_ground_ptr = std::make_shared<pcl::PointCloud<pcl::PointXYZ> >();
-        auto inlier_indices = find_inlier_indices(input_cloud_ptr, best->second,
-            [remove_ground_threshold](float z) -> bool {
-                return z <= remove_ground_threshold;
-            });
-        std::unordered_set<size_t> inlier_set(inlier_indices.begin(), inlier_indices.end());
-        for (size_t i_point = 0; i_point < input_cloud_ptr->size(); i_point++)
-        {
-            if (!inlier_set.count(i_point))
-            {
-                const auto& p = (*input_cloud_ptr)[i_point];
-                cloud_no_ground_ptr->push_back(p);
-            }
-        }
-    }
-    else
-    {
-        cloud_no_ground_ptr = input_cloud_ptr;
-    }
-
-    return cloud_no_ground_ptr;
+    return best ? pcl_without_inliers(input_cloud_ptr, best->second, remove_ground_threshold) : input_cloud_ptr;
 }
 
 
