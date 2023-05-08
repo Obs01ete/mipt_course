@@ -30,6 +30,8 @@
 #include <pcl/point_cloud.h>
 #include <pcl/common/transforms.h>
 
+#include <cmath>
+
 #include <Eigen/Geometry>
 
 
@@ -101,32 +103,32 @@ std::vector<size_t> find_inlier_indices(
  * @param rough_filter_thr Threshold for rough point dropping by Z coordinate (meters)
  * @return
  */
-    auto crop_and_decimate_pcl(
-            pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud_ptr,
-            const size_t decimation_rate,
-            const float rough_filter_thr)
-    {
-        std::mt19937::result_type decimation_seed = 41;
-        std::mt19937 rng_decimation(decimation_seed);
-        auto decimation_gen = std::bind(
-                std::uniform_int_distribution<size_t>(0, decimation_rate), rng_decimation);
+auto crop_and_decimate_pcl(
+        pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud_ptr,
+        const size_t decimation_rate,
+        const float rough_filter_thr)
+{
+    std::mt19937::result_type decimation_seed = 41;
+    std::mt19937 rng_decimation(decimation_seed);
+    auto decimation_gen = std::bind(
+            std::uniform_int_distribution<size_t>(0, decimation_rate), rng_decimation);
 
-        auto filtered_ptr = std::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
-        for (const auto& p : *input_cloud_ptr)
+    auto filtered_ptr = std::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
+    for (const auto& p : *input_cloud_ptr)
+    {
+        if ((p.z > -rough_filter_thr) && (p.z < rough_filter_thr))
         {
-            if ((p.z > -rough_filter_thr) && (p.z < rough_filter_thr))
+            // Use random number generator to avoid introducing patterns
+            // (which are possible with structured subsampling
+            // like picking each Nth point).
+            if (decimation_gen() == 0)
             {
-                // Use random number generator to avoid introducing patterns
-                // (which are possible with structured subsampling
-                // like picking each Nth point).
-                if (decimation_gen() == 0)
-                {
-                    filtered_ptr->push_back(p);
-                }
+                filtered_ptr->push_back(p);
             }
         }
-        return filtered_ptr;
     }
+    return filtered_ptr;
+}
 
 /**
  * Here we figure out the normal to the plane which can be easily calculated
@@ -135,20 +137,35 @@ std::vector<size_t> find_inlier_indices(
  * @param three_points points from which plane will be received
  * @return
  */
-    auto plane_from_points(std::vector<Eigen::Vector3f> three_points) {
-        auto root_point = three_points[0];
-        auto vb = three_points[1] - root_point;
-        auto vc = three_points[2] - root_point;
-        Eigen::Vector3f normal = vb.cross(vc).normalized();
 
-        // Flip the normal if points down
-        if (normal.dot(Eigen::Vector3f::UnitZ()) < 0)
-        {
-            normal = -normal;
-        }
-        Plane plane{root_point, normal};
-        return plane;
+auto plane_from_points(const std::vector<Eigen::Vector3f>& three_points)
+{
+    auto root_point = three_points[0];
+    auto vb = three_points[1] - root_point;
+    auto vc = three_points[2] - root_point;
+    Eigen::Vector3f normal = vb.cross(vc).normalized();
+
+    // Flip the normal if points down
+    if (normal.dot(Eigen::Vector3f::UnitZ()) < 0)
+    {
+        normal = -normal;
     }
+    Plane plane{root_point, normal};
+    return plane;
+}
+
+/**
+ * Returns number of RANSAC iteration based on parameters
+ *
+ * @param inlier_fraction The ration of the inliers to all points in the point cloud
+ * @param ransac_precision Precision factor of RANSAC algorithm
+ * @return
+ */
+size_t count_num_of_ransac_iters(const double inlier_fraction, const double ransac_precision)
+{
+    const double result = std::log(1 - ransac_precision) / std::log(1 - std::pow(inlier_fraction, 3));
+    return std::lround(result);
+}
 
 /**
  * This function performs plane detection with RANSAC sampling of planes
@@ -157,6 +174,8 @@ std::vector<size_t> find_inlier_indices(
  * number of inliers. Inlier points are then removed as belonging to the ground.
  *
  * @param input_cloud_ptr Point cloud
+ * @param inlier_fraction The ration of the inliers to all points in the point cloud
+ * @param ransac_precision Precision factor of ransac algorithm
  * @param remove_ground_threshold How much to decimate the input cloud for RANSAC sampling and inlier counting
  * @param decimation_rate Tolerance threshold on the distance of an inlier to the plane (meters)
  * @param rough_filter_thr Threshold for rough point dropping by Z coordinate (meters)
@@ -166,6 +185,8 @@ std::vector<size_t> find_inlier_indices(
  */
 auto remove_ground_ransac(
         pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud_ptr,
+        const float inlier_fraction = 0.5f,
+        const float ransac_precision = 0.99f,
         const float remove_ground_threshold = 0.2f,
         const size_t decimation_rate = 10,
         const float rough_filter_thr = 0.5f,
@@ -180,7 +201,7 @@ auto remove_ground_ransac(
             std::uniform_int_distribution<size_t>(0, filtered_ptr->size()), sampling_rng);
 
     // Number of RANSAC trials
-    const size_t num_iterations = 25;
+    const size_t num_iterations = count_num_of_ransac_iters(inlier_fraction, ransac_precision);
     // The best plane is determined by a pair of (number of inliers, plane specification)
     using BestPair = std::pair<size_t, Plane>;
     auto best = std::unique_ptr<BestPair>();
@@ -192,8 +213,8 @@ auto remove_ground_ransac(
         for (auto& p : rand3_points) {
             p = (*filtered_ptr)[random_index_gen()].getVector3fMap();
         }
-
         Plane plane = plane_from_points(rand3_points);
+
         // Call find_inlier_indices to retrieve inlier indices.
         // We will need only the number of inliers.
         auto inlier_indices = find_inlier_indices(filtered_ptr, plane,
