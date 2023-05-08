@@ -91,10 +91,10 @@ std::vector<size_t> find_inlier_indices(
 }
 
 /**
- * To reduce the number of outliers (non-ground points) we can roughly crop
- * the point cloud by Z coordinate in the range (-rough_filter_thr, rough_filter_thr).
- * Simultaneously we perform decimation of the remaining points since the full
- * point cloud is excessive for RANSAC.
+ * In order to decrease the amount of non-ground points, a rough cropping
+ * of the point cloud can be done by limiting the Z coordinate to the
+ * range of (-rough_filter_thr, rough_filter_thr). Additionally, decimation
+ * of the remaining points is carried out to avoid excessive data for RANSAC.
  *
  * @param input_cloud_ptr Point cloud
  * @param decimation_rate Tolerance threshold on the distance of an inlier to the plane (meters)
@@ -146,7 +146,15 @@ auto plane_from_points(std::vector<Eigen::Vector3f> three_points) {
     {
         normal = -normal;
     }
-    Plane plane{root_point, normal};
+    normal = (normal.dot(Eigen::Vector3f::UnitZ()) < 0)
+            ?
+            -normal
+            :
+            normal;
+    Plane plane{
+        root_point,
+        normal
+    };
     return plane;
 }
 
@@ -155,7 +163,6 @@ size_t num_of_iterations(const double ratio, const double precision) {
             std::log(1 - precision) / std::log(1 - std::pow(ratio, 3))
             );
 }
-
 
 /**
  * This function performs plane detection with RANSAC sampling of planes
@@ -176,7 +183,9 @@ auto remove_ground_ransac(
         const float remove_ground_threshold = 0.2f,
         const size_t decimation_rate = 10,
         const float rough_filter_thr = 0.5f,
-        const float ransac_tolerance = 0.1f)
+        const float ransac_tolerance = 0.1f,
+        const float inlier_ratio = 0.5f,
+        const float ransac_precision = 0.99f)
 {
     auto filtered_ptr = crop_and_decimate_pcl(input_cloud_ptr, decimation_rate, rough_filter_thr);
 
@@ -184,10 +193,15 @@ auto remove_ground_ransac(
     std::mt19937::result_type sampling_seed = 42;
     std::mt19937 sampling_rng(sampling_seed);
     auto random_index_gen = std::bind(
-            std::uniform_int_distribution<size_t>(0, filtered_ptr->size()), sampling_rng);
+            std::uniform_int_distribution<size_t>(0, filtered_ptr->size()),
+            sampling_rng
+            );
 
     // Number of RANSAC trials
-    const size_t num_iterations = 25;
+    const size_t num_iterations = num_of_iterations(
+            inlier_ratio,
+            ransac_precision
+            );
     // The best plane is determined by a pair of (number of inliers, plane specification)
     using BestPair = std::pair<size_t, Plane>;
     auto best = std::unique_ptr<BestPair>();
