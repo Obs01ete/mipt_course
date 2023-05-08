@@ -54,30 +54,29 @@ std::vector<size_t> find_inlier_indices(
 {
     using Transform3f = Eigen::Transform<float, 3, Eigen::Affine, Eigen::DontAlign>;
 
-    // Before rotation of the coordinate frame we need to relocate the point cloud to
-    // the position of base_point of the plane.
+    // Compute the transformation that relocates the point cloud to the position of base_point of the plane
     Transform3f world_to_ransac_base = Transform3f::Identity();
     world_to_ransac_base.translate(-plane.base_point);
+
+    // Apply the transformation to the input cloud
     auto ransac_base_cloud_ptr = std::make_shared<pcl::PointCloud<pcl::PointXYZ> >();
     pcl::transformPointCloud(*input_cloud_ptr, *ransac_base_cloud_ptr, world_to_ransac_base);
 
-    // We are going to use a quaternion to determine the rotation transform
-    // which is required to rotate a coordinate system that plane's normal
-    // becomes aligned with Z coordinate axis.
-    auto rotate_to_plane_quat = Eigen::Quaternionf::FromTwoVectors(
-        plane.normal,
-        Eigen::Vector3f::UnitZ()
-    ).normalized();
+    // Compute the quaternion that rotates the plane's normal to align with the Z coordinate axis
+    Eigen::Quaternionf rotate_to_plane_quat = Eigen::Quaternionf::FromTwoVectors(
+            plane.normal.normalized(),
+            Eigen::Vector3f::UnitZ()
+    );
 
-    // Now we can create a rotation transform and align the cloud that
-    // the candidate plane matches XY plane.
+    // Compute the transformation that aligns the cloud with the XY plane
     Transform3f ransac_base_to_ransac = Transform3f::Identity();
     ransac_base_to_ransac.rotate(rotate_to_plane_quat);
+
+    // Apply the transformation to the cloud that matches the candidate plane
     auto aligned_cloud_ptr = std::make_shared<pcl::PointCloud<pcl::PointXYZ> >();
     pcl::transformPointCloud(*ransac_base_cloud_ptr, *aligned_cloud_ptr, ransac_base_to_ransac);
 
-    // Once the point cloud is transformed into the plane coordinates,
-    // We can apply a simple criterion on Z coordinate to find inliers.
+    // Find inliers based on the condition on Z coordinate
     std::vector<size_t> indices;
     for (size_t i_point = 0; i_point < aligned_cloud_ptr->size(); i_point++)
     {
@@ -87,6 +86,7 @@ std::vector<size_t> find_inlier_indices(
             indices.push_back(i_point);
         }
     }
+
     return indices;
 }
 
