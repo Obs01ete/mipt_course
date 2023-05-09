@@ -45,10 +45,15 @@ struct Plane
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
+// Helper alias for input iterator SFINAE check
+template<typename It>
+using InputItCheck =
+    std::enable_if_t<
+    std::is_base_of<std::input_iterator_tag, typename std::iterator_traits<It>::iterator_category>::value, int>;
 
 // This helper function finds indices of points that are considered inliers,
 // given a plane description and a condition on signed distance from the plane.
-template<class InputIt, class ConditionZ>
+template<class InputIt, class ConditionZ, InputItCheck<InputIt> = 0>
 inline std::vector<size_t> find_inlier_indices(
     InputIt it, InputIt end,
     const Plane& plane,
