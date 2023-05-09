@@ -32,7 +32,6 @@
 
 #include <Eigen/Geometry>
 
-
 namespace lidar_course {
 
 
@@ -61,15 +60,13 @@ inline std::vector<size_t> find_inlier_indices(
     auto n = plane.normal;
     float d_coeff = -n.dot(plane.base_point);
 
-    float nx = n[0], ny = n[1], nz = n[2];
-
     // We can apply a simple criterion on signed distance (which is equal
     // to z coordinate in plane coordinate system) to find inliers.
     std::vector<size_t> indices;
     for (size_t i_point = 0, end = input_cloud_ptr->size(); i_point != end; ++i_point)
     {
         const auto& p = (*input_cloud_ptr)[i_point];
-        float dist = nx*p.x + ny*p.y + nz*p.z + d_coeff;
+        float dist = n[0]*p.x + n[1]*p.y + n[2]*p.z + d_coeff;
 
         if (condition_z(dist))
         {
@@ -116,9 +113,9 @@ inline auto remove_ground_ransac(
     }
 
     // Number of probes is based on the required errors probability and
-    // expected share of plane points in cloud
+    // expected share of plane points in the cloud
     const float required_error_prob = 0.001;
-    const float expected_plane_pts_share = 0.67;
+    const float expected_plane_pts_share = 0.6;
     const float wrong_sample_prob = 1 - std::pow(expected_plane_pts_share, 3);
     const size_t num_iterations = std::log(required_error_prob) / std::log(wrong_sample_prob);
 
@@ -148,6 +145,14 @@ inline auto remove_ground_ransac(
         auto vc = pc - pa;
         Eigen::Vector3f normal = vb.cross(vc).normalized();
 
+        // Check if the normal is valid. It can be invalid in case of equal points smaple.
+        float float_zero_thr = 1e-5;
+        float normal_len_sq = normal.dot(normal);
+        if (std::isnan(normal_len_sq) || std::abs(normal_len_sq - 1) > float_zero_thr)
+        {
+            continue;
+        }
+
         // Flip the normal if points down
         if (normal.dot(Eigen::Vector3f::UnitZ()) < 0)
         {
@@ -167,6 +172,13 @@ inline auto remove_ground_ransac(
         {
             best = BestPair{inlier_indices.size(), plane};
         }
+    }
+
+    // There is a tiny chance not to find a valid plane. If a valid plane is
+    // found, at least three origin points are the inliers.
+    if (best.first == 0)
+    {
+        return input_cloud_ptr;
     }
 
     // After the final plane is found this is the threshold below which all
