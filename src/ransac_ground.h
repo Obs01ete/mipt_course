@@ -32,7 +32,6 @@
 
 #include <Eigen/Geometry>
 
-
 namespace lidar_course {
 
 
@@ -40,59 +39,47 @@ namespace lidar_course {
 // and a normal vector to the plane.
 struct Plane
 {
-    Eigen::Vector3f base_point;
-    Eigen::Vector3f normal;
+    Eigen::Vector3f base_point {};
+    Eigen::Vector3f normal {};
 
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
+// Helper alias for input iterator SFINAE check
+template<typename It>
+using InputItCheck =
+    std::enable_if_t<
+    std::is_base_of<std::input_iterator_tag, typename std::iterator_traits<It>::iterator_category>::value, int>;
 
 // This helper function finds indices of points that are considered inliers,
-// given a plane description and a condition on distance from the plane.
-std::vector<size_t> find_inlier_indices(
-    const pcl::PointCloud<pcl::PointXYZ>::Ptr& input_cloud_ptr,
+// given a plane description and a condition on signed distance from the plane.
+template<class InputIt, class ConditionZ, InputItCheck<InputIt> = 0>
+inline std::vector<size_t> find_inlier_indices(
+    InputIt it, InputIt end,
     const Plane& plane,
-    std::function<bool(float)> condition_z_fn)
+    ConditionZ condition_z)
 {
-    typedef Eigen::Transform<float, 3, Eigen::Affine, Eigen::DontAlign> Transform3f;
+    // Use general form of the equation of a plane:
+    // ax + by + cz + d = 0,
+    // normal = [a, b, c]
+    auto n = plane.normal;
+    float d_coeff = -n.dot(plane.base_point);
 
-    auto base_point = plane.base_point;
-    auto normal = plane.normal;
-
-    // Before rotation of the coordinate frame we need to relocate the point cloud to
-    // the position of base_point of the plane.
-    Transform3f world_to_ransac_base = Transform3f::Identity();
-    world_to_ransac_base.translate(-base_point);
-    auto ransac_base_cloud_ptr = std::make_shared<pcl::PointCloud<pcl::PointXYZ> >();
-    pcl::transformPointCloud(*input_cloud_ptr, *ransac_base_cloud_ptr, world_to_ransac_base);
-
-    // We are going to use a quaternion to determine the rotation transform
-    // which is required to rotate a coordinate system that plane's normal
-    // becomes aligned with Z coordinate axis.
-    auto rotate_to_plane_quat = Eigen::Quaternionf::FromTwoVectors(
-        normal,
-        Eigen::Vector3f::UnitZ()
-    ).normalized();
-
-    // Now we can create a rotation transform and align the cloud that
-    // the candidate plane matches XY plane.
-    Transform3f ransac_base_to_ransac = Transform3f::Identity();
-    ransac_base_to_ransac.rotate(rotate_to_plane_quat);
-    auto aligned_cloud_ptr = std::make_shared<pcl::PointCloud<pcl::PointXYZ> >();
-    pcl::transformPointCloud(*ransac_base_cloud_ptr, *aligned_cloud_ptr, ransac_base_to_ransac);
-
-    // Once the point cloud is transformed into the plane coordinates,
-    // We can apply a simple criterion on Z coordinate to find inliers.
-    std::vector<size_t> indices;
-    for (size_t i_point = 0; i_point < aligned_cloud_ptr->size(); i_point++)
+    // We can apply a simple criterion on signed distance (which is equal
+    // to z coordinate in plane coordinate system) to find inliers.
+    std::vector<size_t> indices {};
+    for (size_t idx = 0; it != end; ++it, ++idx)
     {
-        const auto& p = (*aligned_cloud_ptr)[i_point];
-        if (condition_z_fn(p.z))
+        const auto& p = *it;
+        float dist = n[0]*p.x + n[1]*p.y + n[2]*p.z + d_coeff;
+
+        if (condition_z(dist))
         {
-            indices.push_back(i_point);
+            indices.push_back(idx);
         }
     }
-    return indices;
+
+   return indices;
 }
 
 
@@ -100,7 +87,7 @@ std::vector<size_t> find_inlier_indices(
 // that lie on triplets of points randomly sampled from the cloud.
 // Among all trials the plane that is picked is the one that has the highest
 // number of inliers. Inlier points are then removed as belonging to the ground.
-auto remove_ground_ransac(
+inline auto remove_ground_ransac(
     pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud_ptr)
 {
     // Threshold for rough point dropping by Z coordinate (meters)
@@ -108,60 +95,74 @@ auto remove_ground_ransac(
     // How much to decimate the input cloud for RANSAC sampling and inlier counting
     const size_t decimation_rate = 10;
 
-    // Tolerance threshold on the distance of an inlier to the plane (meters)
-    const float ransac_tolerance = 0.1f;
-    // After the final plane is found this is the threshold below which all
-    // points are discarded as belonging to the ground.
-    const float remove_ground_threshold = 0.2f;
-
     // To reduce the number of outliers (non-ground points) we can roughly crop
     // the point cloud by Z coordinate in the range (-rough_filter_thr, rough_filter_thr).
     // Simultaneously we perform decimation of the remaining points since the full
     // point cloud is excessive for RANSAC.
-    std::mt19937::result_type decimation_seed = 41;
-    std::mt19937 rng_decimation(decimation_seed);
+    std::mt19937 rng_decimation(std::random_device {}());
     auto decimation_gen = std::bind(
         std::uniform_int_distribution<size_t>(0, decimation_rate), rng_decimation);
 
-    auto filtered_ptr = std::make_shared<pcl::PointCloud<pcl::PointXYZ> >();
-    for (const auto& p : *input_cloud_ptr)
-    {
-        if ((p.z > -rough_filter_thr) && (p.z < rough_filter_thr))
+    std::vector<pcl::PointXYZ> rough_filtered_cloud {};
+    // It is highly probable that such amount of memory will be enought
+    rough_filtered_cloud.reserve(input_cloud_ptr->size() / decimation_rate);
+    std::insert_iterator<std::vector<pcl::PointXYZ>> insert_it
+        {rough_filtered_cloud, rough_filtered_cloud.end()};
+
+    // Use random number generator to avoid introducing patterns
+    // (which are possible with structured subsampling
+    // like picking each Nth point).
+    std::copy_if(input_cloud_ptr->cbegin(), input_cloud_ptr->cend(), insert_it,
+        [&](const pcl::PointXYZ& p) -> bool
         {
-            // Use random number generator to avoid introducing patterns
-            // (which are possible with structured subsampling
-            // like picking each Nth point).
-            if (decimation_gen() == 0)
+            if ((p.z > -rough_filter_thr) && (p.z < rough_filter_thr))
             {
-                filtered_ptr->push_back(p);
+                return decimation_gen() == 0;
             }
-        }
-    }
+
+            return false; 
+        });
+
+    // Number of probes is based on the required errors probability and
+    // expected share of plane points in the cloud
+    const float required_error_prob = 0.001;
+    const float expected_plane_pts_share = 0.6;
+    const float wrong_sample_prob = 1 - std::pow(expected_plane_pts_share, 3);
+    const size_t num_iterations = std::log(required_error_prob) / std::log(wrong_sample_prob);
+
+    // Tolerance threshold on the distance of an inlier to the plane (meters)
+    const float ransac_tolerance = 0.1f;
 
     // We need a random number generator for sampling triplets of points.
-    std::mt19937::result_type sampling_seed = 42;
-    std::mt19937 sampling_rng(sampling_seed);
+    std::mt19937 sampling_rng(std::random_device {}());
     auto random_index_gen = std::bind(
-        std::uniform_int_distribution<size_t>(0, filtered_ptr->size()), sampling_rng);
+        std::uniform_int_distribution<size_t>(0, rough_filtered_cloud.size()), sampling_rng);
 
-    // Number of RANSAC trials
-    const size_t num_iterations = 25;
     // The best plane is determined by a pair of (number of inliers, plane specification)
-    typedef std::pair<size_t, Plane> BestPair;
-    auto best = std::unique_ptr<BestPair>();
+    using BestPair = std::pair<size_t, Plane>;
+    // Default value will be replaced by any kind of choosen pair
+    BestPair best {};
     for (size_t i_iter = 0; i_iter < num_iterations; i_iter++)
     {
         // Sample 3 random points.
         // pa is special in the sense that is becomes an anchor - a base_point of the plane
-        Eigen::Vector3f pa = (*filtered_ptr)[random_index_gen()].getVector3fMap();
-        Eigen::Vector3f pb = (*filtered_ptr)[random_index_gen()].getVector3fMap();
-        Eigen::Vector3f pc = (*filtered_ptr)[random_index_gen()].getVector3fMap();
+        Eigen::Vector3f pa = rough_filtered_cloud[random_index_gen()].getVector3fMap();
+        Eigen::Vector3f pb = rough_filtered_cloud[random_index_gen()].getVector3fMap();
+        Eigen::Vector3f pc = rough_filtered_cloud[random_index_gen()].getVector3fMap();
 
         // Here we figure out the normal to the plane which can be easily calculated
         // as a normalized cross product.
         auto vb = pb - pa;
         auto vc = pc - pa;
         Eigen::Vector3f normal = vb.cross(vc).normalized();
+
+        // Check if the normal is valid. It can be invalid in case of equal points smaple.
+        float float_zero_thr = 1e-5;
+        float normal_len_sq = normal.dot(normal);
+        if (std::isnan(normal_len_sq) || std::abs(normal_len_sq - 1) > float_zero_thr)
+        {
+            continue;
+        }
 
         // Flip the normal if points down
         if (normal.dot(Eigen::Vector3f::UnitZ()) < 0)
@@ -173,56 +174,43 @@ auto remove_ground_ransac(
 
         // Call find_inlier_indices to retrieve inlier indices.
         // We will need only the number of inliers.
-        auto inlier_indices = find_inlier_indices(filtered_ptr, plane,
+        auto inlier_indices = find_inlier_indices(
+            rough_filtered_cloud.cbegin(), rough_filtered_cloud.cend(), plane,
             [ransac_tolerance](float z) -> bool {
                 return (z >= -ransac_tolerance) && (z <= ransac_tolerance);
             });
 
-        // If new best plane is found, update the best
-        bool found_new_best = false;
-        if (best)
+        if (inlier_indices.size() > best.first)
         {
-            if (inlier_indices.size() > best->first)
-            {
-                found_new_best = true;
-            }
-        }
-        else
-        {
-            // For the first trial update anyway
-            found_new_best = true;
-        }
-
-        if (found_new_best)
-        {
-            best = std::unique_ptr<BestPair>(new BestPair{inlier_indices.size(), plane});
+            best = BestPair{inlier_indices.size(), plane};
         }
     }
+
+    // There is a tiny chance not to find a valid plane. If a valid plane is
+    // found, at least three origin points are the inliers.
+    if (best.first == 0)
+    {
+        return input_cloud_ptr;
+    }
+
+    // After the final plane is found this is the threshold below which all
+    // points are discarded as belonging to the ground.
+    const float remove_ground_threshold = 0.2f;
 
     // For the best plane filter out all the points that are
     // below the plane + remove_ground_threshold.
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_no_ground_ptr;
-    if (best)
-    {
-        cloud_no_ground_ptr = std::make_shared<pcl::PointCloud<pcl::PointXYZ> >();
-        auto inlier_indices = find_inlier_indices(input_cloud_ptr, best->second,
-            [remove_ground_threshold](float z) -> bool {
-                return z <= remove_ground_threshold;
-            });
-        std::unordered_set<size_t> inlier_set(inlier_indices.begin(), inlier_indices.end());
-        for (size_t i_point = 0; i_point < input_cloud_ptr->size(); i_point++)
-        {
-            bool extract_non_ground = true;
-            if ((inlier_set.find(i_point) == inlier_set.end()) == extract_non_ground)
-            {
-                const auto& p = (*input_cloud_ptr)[i_point];
-                cloud_no_ground_ptr->push_back(p);
-            }
-        }
-    }
-    else
-    {
-        cloud_no_ground_ptr = input_cloud_ptr;
+    auto cloud_no_ground_indices = find_inlier_indices(
+        input_cloud_ptr->cbegin(), input_cloud_ptr->cend(), best.second,
+        [remove_ground_threshold](float z) -> bool {
+            return z > remove_ground_threshold;
+        });
+
+    cloud_no_ground_ptr = std::make_shared<pcl::PointCloud<pcl::PointXYZ> >();
+    cloud_no_ground_ptr->reserve(cloud_no_ground_indices.size());
+    for (auto i_no_ground : cloud_no_ground_indices) {
+        const auto& p = (*input_cloud_ptr)[i_no_ground];
+        cloud_no_ground_ptr->push_back(p);
     }
 
     return cloud_no_ground_ptr;
@@ -230,3 +218,5 @@ auto remove_ground_ransac(
 
 
 } // namespace lidar_course
+
+
