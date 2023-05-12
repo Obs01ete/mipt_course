@@ -1,2 +1,5 @@
 build/
 extra/
+.vscode/
+cmake-build-debug/
+.idea/
