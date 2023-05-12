@@ -1,7 +1,8 @@
 /**
  * MIT License
  *
- * Copyright (c) 2020 Dmitrii Khizbullin <dmitrii.khizbullin@gmail.com>
+ * Copyright (c) 2023 Dmitriy Nadykto <nadykto.dmitry@gmail.com>,
+ *                    Dmitrii Khizbullin <dmitrii.khizbullin@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -29,7 +30,7 @@
 #include <pcl/surface/concave_hull.h>
 
 #include "interface_types.h"
-
+#include "graham_hull.h"
 
 namespace {
     // A special label that is assigned
@@ -70,9 +71,12 @@ auto GenericHull2D(const typename pcl::PointCloud<T>::Ptr& flat_cloud_ptr,
     }
     else
     {
-        pcl::ConvexHull<pcl::PointXYZ> convex_hull;
+//        pcl::ConvexHull<pcl::PointXYZ> convex_hull;
+//        convex_hull.setInputCloud(flat_cloud_ptr);
+//        convex_hull.setDimension(2);
+//        convex_hull.reconstruct(*flat_hull_cloud_ptr, *flat_polygons_ptr);
+        GrahamHull<pcl::PointXYZ> convex_hull;
         convex_hull.setInputCloud(flat_cloud_ptr);
-        convex_hull.setDimension(2);
         convex_hull.reconstruct(*flat_hull_cloud_ptr, *flat_polygons_ptr);
     }
 
