@@ -37,7 +37,6 @@
 
 #include <pcl/common/transforms.h>
 #include <pcl/filters/conditional_removal.h>
-#include <pcl/filters/voxel_grid.h>
 
 #include <Eigen/Geometry>
 
@@ -81,22 +80,7 @@ auto decimate_cloud(typename pcl::PointCloud<PointT>::Ptr input_cloud_ptr,
             decimaterd_ptr->push_back(point);
         }
     }
-
-    auto filtered_ptr = std::make_shared<typename pcl::PointCloud<PointT>>();
-    if (decimation_coef > 1)
-    {
-        pcl::VoxelGrid<PointT> voxel_grid;
-        voxel_grid.setInputCloud(decimaterd_ptr);
-        const float voxel_size = 0.1f;
-        voxel_grid.setLeafSize(voxel_size, voxel_size, voxel_size);
-        voxel_grid.filter(*filtered_ptr);
-    }
-    else
-    {
-        filtered_ptr = decimaterd_ptr;
-    }
-
-    return filtered_ptr;
+    return decimaterd_ptr;
 }
 
 
