@@ -68,7 +68,7 @@ public:
     {
         return m_transposed.data();
     }
-    
+
     int width()
     {
         return m_image.width();
