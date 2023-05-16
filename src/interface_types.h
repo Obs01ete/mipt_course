@@ -10,8 +10,8 @@
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
  *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -22,40 +22,36 @@
  * SOFTWARE.
  */
 
-
 #pragma once
 
-#include <vector>
 #include <memory>
+#include <vector>
 
 #include <pcl/common/common.h>
 
-
 namespace lidar_course {
 
+enum ConvexType { ConvexTypeStd, ConvexTypeGraham };
+extern ConvexType CONVEX_TYPE;
 
 // This struct keeps the description of everything that relates to a cluster.
-struct ClusterWithHull
-{
-    // Unique identifier, starting from 1 as 0 is reserved for "unclustered"
-    std::uint32_t cluster_id;
-    // The entire point cloud of the cluster
-    pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud;
-    // Exclusively points that belong to the hull.
-    pcl::PointCloud<pcl::PointXYZ>::ConstPtr hull_cloud;
-    // The list of triangles to render the hull,
-    // as indices of points from hull_cloud
-    std::shared_ptr<std::vector<pcl::Vertices> > hull_vertices;
+struct ClusterWithHull {
+  // Unique identifier, starting from 1 as 0 is reserved for "unclustered"
+  std::uint32_t cluster_id;
+  // The entire point cloud of the cluster
+  pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud;
+  // Exclusively points that belong to the hull.
+  pcl::PointCloud<pcl::PointXYZ>::ConstPtr hull_cloud;
+  // The list of triangles to render the hull,
+  // as indices of points from hull_cloud
+  std::shared_ptr<std::vector<pcl::Vertices>> hull_vertices;
 };
-
 
 // This is a convenience struct that holds the labeled cloud and
 // a list of clusters and their convex hulls.
-struct CloudAndClusterHulls
-{
-    pcl::PointCloud<pcl::PointXYZL>::Ptr cloud;
-    std::vector<ClusterWithHull> clusters_with_hull;
+struct CloudAndClusterHulls {
+  pcl::PointCloud<pcl::PointXYZL>::Ptr cloud;
+  std::vector<ClusterWithHull> clusters_with_hull;
 };
-
 
 } // namespace lidar_course

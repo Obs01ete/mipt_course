@@ -10,8 +10,8 @@
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
  *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -22,72 +22,53 @@
  * SOFTWARE.
  */
 
-
 #pragma once
 
 #include <fstream>
-#include <vector>
 #include <map>
 #include <string>
+#include <vector>
 
 #include <Eigen/Dense>
 
-
 namespace lidar_course {
 
-
-// Every container that stores Eigen objects must have an aligned_allocator specified.
-typedef std::map<std::string, Eigen::Matrix4f, std::less<std::string>,
-    Eigen::aligned_allocator<std::pair<std::string, Eigen::Vector4f> > > CalibMap;
-
+// Every container that stores Eigen objects must have an aligned_allocator
+// specified.
+typedef std::map<
+    std::string, Eigen::Matrix4f, std::less<std::string>,
+    Eigen::aligned_allocator<std::pair<std::string, Eigen::Vector4f>>>
+    CalibMap;
 
 // Parses Kitti calibration file format into Eigen::Matrix4f
-CalibMap parse_calib(std::string path)
-{
-    CalibMap map;
+CalibMap parse_calib(std::string path) {
+  CalibMap map;
 
-    std::ifstream infile(path);
-    if (infile.is_open())
-    {
-        std::string line;
-        while (std::getline(infile, line))
-        {
-            std::istringstream iss(line);
-            std::vector<std::string> result;
-            for (std::string s; iss >> s; )
-            {
-                result.push_back(s);
-            }
-            if (result.size() == 13)
-            {
-                auto name = result[0];
-                std::vector<float> elems;
-                for (int i = 1; i <= 12; i++)
-                {
-                    elems.push_back(std::stof(result[i]));
-                }
-                Eigen::Matrix4f mat;
-                mat <<
-                    elems[0],
-                    elems[1],
-                    elems[2],
-                    elems[3],
-                    elems[4],
-                    elems[5],
-                    elems[6],
-                    elems[7],
-                    elems[8],
-                    elems[9],
-                    elems[10],
-                    elems[11],
-                    0, 0, 0, 1;
-                map[name] = mat;
-            }
+  std::ifstream infile(path);
+  if (infile.is_open()) {
+    std::string line;
+    while (std::getline(infile, line)) {
+      std::istringstream iss(line);
+      std::vector<std::string> result;
+      for (std::string s; iss >> s;) {
+        result.push_back(s);
+      }
+      if (result.size() == 13) {
+        auto name = result[0];
+        std::vector<float> elems;
+        for (int i = 1; i <= 12; i++) {
+          elems.push_back(std::stof(result[i]));
         }
-        infile.close();
+        Eigen::Matrix4f mat;
+        mat << elems[0], elems[1], elems[2], elems[3], elems[4], elems[5],
+            elems[6], elems[7], elems[8], elems[9], elems[10], elems[11], 0, 0,
+            0, 1;
+        map[name] = mat;
+      }
     }
-    return map;
+    infile.close();
+  }
+  return map;
 }
-
 
 } // namespace lidar_course
