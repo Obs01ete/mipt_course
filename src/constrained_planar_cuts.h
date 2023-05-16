@@ -51,7 +51,7 @@ template<typename PointT>
 auto constrained_planar_cuts_segmentation(typename pcl::PointCloud<PointT>::Ptr input_cloud_ptr)
 {
     ///  Default values of parameters before parsing
-    
+
     // Supervoxel Stuff
     float voxel_resolution = 0.20f; //0.15f
     float seed_resolution = 0.03f;

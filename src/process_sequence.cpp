@@ -117,7 +117,7 @@ int main(int argc, char** argv)
     // Here we instantiate our processing class.
     Processor processor(processor_params);
 
-    // This is instantiation of the point cloud visualizer class. 
+    // This is instantiation of the point cloud visualizer class.
     Visualizer cloud_viewer(processor_params);
 
     // We are going to render images in a separate window.
@@ -136,12 +136,12 @@ int main(int argc, char** argv)
         int frame_idx = 0;
         CloudAndClusterHulls cloud_and_clusters{};
         std::unique_ptr<Image> p_image;
-        
+
         // In this loop the frames are processed and visualized one by one
         while (true)
         {
             auto start_time = std::chrono::system_clock::now();
-            
+
             // This condition allows us to stop and resume playback of
             // the sequence with S key
             if (cloud_viewer.is_running() || frame_idx == 0)
