@@ -29,7 +29,7 @@
 #include <pcl/surface/concave_hull.h>
 
 #include "interface_types.h"
-
+#include "graham_hull.h"
 
 namespace {
     // A special label that is assigned
@@ -70,9 +70,8 @@ auto GenericHull2D(const typename pcl::PointCloud<T>::Ptr& flat_cloud_ptr,
     }
     else
     {
-        pcl::ConvexHull<pcl::PointXYZ> convex_hull;
+        GrahamHull<pcl::PointXYZ> convex_hull;
         convex_hull.setInputCloud(flat_cloud_ptr);
-        convex_hull.setDimension(2);
         convex_hull.reconstruct(*flat_hull_cloud_ptr, *flat_polygons_ptr);
     }
 
