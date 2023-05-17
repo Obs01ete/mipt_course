@@ -42,7 +42,7 @@ RUN git clone https://github.com/PointCloudLibrary/pcl.git && \
         mkdir build && \
         cd build && \
         cmake .. && \
-        make -j8 && \
+        make -j4 && \
         make install \
     ) && \
     rm -rf pcl
