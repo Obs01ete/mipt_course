@@ -44,6 +44,8 @@ struct ProcessorParams
     std::atomic<size_t> m_num_clouds;
     std::atomic<bool> m_do_clusterize;
 
+    std::atomic<bool> m_use_dbscan;
+
     ProcessorParams(size_t decimation_coef,
                     bool remove_ground,
                     size_t num_clouds,
