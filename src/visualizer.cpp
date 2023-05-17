@@ -133,6 +133,9 @@ void Visualizer::keyboardEventOccurred(
         case (int) 'S':
             pthis->m_is_running = !pthis->m_is_running;
             break;
+        case (int) 'u':
+            pthis->m_params->m_use_dbscan = !pthis->m_params->m_use_dbscan;
+            break;
         default:
             break;
         }

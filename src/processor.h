@@ -38,6 +38,7 @@
 #include "clusters_and_hulls.h"
 #include "processor_params.h"
 #include "ransac_ground.h"
+#include "dbscan.h"
 
 
 namespace lidar_course {
@@ -184,7 +185,14 @@ public:
         CloudAndClusterHulls cloud_and_cluster_hulls;
         if (m_params->m_do_clusterize)
         {
-            auto cpc_labeled_cloud = constrained_planar_cuts_segmentation<pcl::PointXYZ>(cloud_after_ground_ptr);
+            pcl::PointCloud<pcl::PointXYZL>::Ptr cpc_labeled_cloud; 
+            if(m_params->m_use_dbscan)  {
+                cpc_labeled_cloud = DBScanSegmentation(cloud_after_ground_ptr);
+            } else {
+                cpc_labeled_cloud = 
+                    constrained_planar_cuts_segmentation<pcl::PointXYZ>(
+                        cloud_after_ground_ptr);
+            }
             cloud_and_cluster_hulls = find_primary_clusters(cpc_labeled_cloud);
         }
         else
