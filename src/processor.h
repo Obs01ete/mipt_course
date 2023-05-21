@@ -29,6 +29,7 @@
 #include <vector>
 #include <unordered_map>
 #include <cstdint>
+#include "dbscan.h"
 
 #include <Eigen/Geometry>
 
@@ -184,8 +185,8 @@ public:
         CloudAndClusterHulls cloud_and_cluster_hulls;
         if (m_params->m_do_clusterize)
         {
-            auto cpc_labeled_cloud = constrained_planar_cuts_segmentation<pcl::PointXYZ>(cloud_after_ground_ptr);
-            cloud_and_cluster_hulls = find_primary_clusters(cpc_labeled_cloud);
+            auto dbscan_labeled_cloud = dbscan::dbscan_segmentation(cloud_after_ground_ptr);
+            cloud_and_cluster_hulls = find_primary_clusters(dbscan_labeled_cloud);
         }
         else
         {
